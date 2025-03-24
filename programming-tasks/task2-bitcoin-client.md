@@ -1,93 +1,139 @@
-# Task 2: Bitcoin client
+# Task 2: Connect to the Bitcoin Network
 
-The Bitcoin P2P protocol defines a set of messages that can be exchanged between peers.
-A good reference is the [Bitcoin Wiki](https://en.bitcoin.it/wiki/Protocol_documentation).
-However, contrary to other systems in which the implementations should comply to a certain specification (i.e., a mismatching behavior between the specification document and a piece of software that implements it is considered a bug in the software artifact), in the Bitcoin network the [Bitcoin Core](https://github.com/bitcoin/bitcoin) client serves as a reference implementation.
-Off course there is some effort in formally specifying certain behaviors by means of [Bitcoin Improvement Proposals](https://github.com/bitcoin/bips) (BIPS), but it is correct to say that, for the most part, the correct behavior in the network is whatever Bitcoin Core does in a certain situation, i.e., the software implementation is the specification.
-This is quite unfortunate because it forces us to study the Bitcoin Core source code in case things don't work as expected.
-To encourage you to do so, we included references to relevant parts of the Bitcoin Core source code when appropriate[^1].
-Also, that's why developing well designed and tested libraries is so important for the Bitcoin ecosystem.
+> *“Before the first word is spoken, a protocol must be assumed.
+> But who speaks first when no one is listening yet?”*
 
-[^1]: You came to learn Rust in a Bitcoin context, and since Rust tries to fit in the same niche as C++, studying a complex C++ code base will be beneficial.
+In the previous task, we explored how new nodes **bootstrap** into a peer-to-peer network.
+Now it’s time to participate.
+In this task, you'll build a simple Bitcoin client that connects to a node on the public network using the Bitcoin P2P protocol.
 
-## P2P protocol v1
+This protocol defines how peers exchange messages.
+But unlike many internet protocols that rely on a **formal specification**, Bitcoin takes a different route:
+**Bitcoin Core *is* the specification**.
+There are efforts to document expected behaviors through [BIPs](https://github.com/bitcoin/bips), but the most reliable way to know what’s “correct” is to see what Bitcoin Core does.
 
-Bitcoin is a permissionless network whose purpose is to reach consensus over public data.
-Since all data relayed in the Bitcoin P2P network is inherently public, and the protocol lacks a notion of cryptographic identities, peers talk to each other over unencrypted and unauthenticated connections.
-Furthermore, the protocol is agnostic to what transport mechanism is used to send and receive bytes.
-The original Satoshi client used IPv4 TCP streams.
-Current versions of Bitcoin Core[^2] support IPv6 TCP, Tor and I2P streams.
+That means studying code—not just specs.
+To help you do that, we've linked directly to key parts of the [Bitcoin Core codebase](https://github.com/bitcoin/bitcoin) where relevant.
 
-[^2]: v28 by the time of the writing.
+---
 
-The network messages follow a common structure[^3]:
+## A Word About the Protocol
 
-[^3]: See the [CMessageHeader class](https://github.com/bitcoin/bitcoin/blob/dfb7d58108daf3728f69292b9e6dba437bb79cc7/src/protocol.h#L28).
+Bitcoin's P2P layer is unencrypted and unauthenticated.
+It assumes all data is public and operates over any byte stream (originally just TCP).
+In practice, modern Bitcoin Core supports IPv6, Tor, and I2P as well.
 
-- **magic**: 4 bytes indicating message origin network, and used to seek to next message when stream state is unknown;
-- **command**: 12 bytes with a NULL padded ASCII string identifying the packet content;
-- **payload_size**: 4 bytes indicating the length of payload in number of bytes (can be zero for messages with no payload);
-- **checksum**: first 4 bytes of sha256(sha256(payload));
-- **payload**: actual data, if any.
+All network messages follow the same high-level format[^1]:
 
-<!-- 
-TODO: insert reference for the Bitcoin Core code where this is implemented.
+- `magic` (4 bytes): identifies the network (mainnet, testnet, etc.)
+- `command` (12 bytes): null-padded ASCII command string
+- `payload_size` (4 bytes): length in bytes
+- `checksum` (4 bytes): first 4 bytes of `SHA256(SHA256(payload))`
+- `payload`: actual content
 
-CMessageHeader: https://github.com/bitcoin/bitcoin/blob/dfb7d58108daf3728f69292b9e6dba437bb79cc7/src/protocol.h#L28
+You’ll work with the following message types:
 
-ProcessMessage: https://github.com/bitcoin/bitcoin/blob/dbc450c1b59b24421ba93f3e21faa8c673c0df4c/src/net_processing.cpp#L3715
+- `version`, `verack`: used during the handshake
+- `ping`, `pong`: used to keep connections alive
+- `getaddr`, `addr`: used to request and share peer information
 
-Handshake: https://github.com/bitcoin/bitcoin/blob/dbc450c1b59b24421ba93f3e21faa8c673c0df4c/src/net_processing.cpp#L3726
+Ignore the other message types for now[^2].
 
+[^1]: [CMessageHeader class](https://github.com/bitcoin/bitcoin/blob/dfb7d58108daf3728f69292b9e6dba437bb79cc7/src/protocol.h#L28)
+[^2]: See [`NetMsgType`](https://github.com/bitcoin/bitcoin/blob/dfb7d58108daf3728f69292b9e6dba437bb79cc7/src/protocol.h#L60)
 
--->
+---
 
-Almost all integers are encoded in little endian, i.e., least significant bytes are sent first.
-Only IP or port numbers are encoded big endian.
-For this task, you'll need to deal with `version`, `verack`, `ping`, `pong`, `getaddr`, and `addr` messages.
-All others[^4] can be safely ignored.
+## Your Task: Write a Basic Bitcoin Client
 
-[^4]: All known messages are in the [`NetMsgType` namespace](https://github.com/bitcoin/bitcoin/blob/dfb7d58108daf3728f69292b9e6dba437bb79cc7/src/protocol.h#L60).
+You’re going to write a small client that connects to a public node, completes the handshake, and asks for addresses of other peers.
 
-To initiate a connection, a Bitcoin client opens a TCP socket to the remote host and sends a `version`[^5] message.
-In response, the remote node will send us back their `version` and a `verack` message in case they accept our connection.
-The handshake finalizes by sending a `verack` signaling to the remote node we are accepting messages from it[^6].
+Use the [`bitcoin` crate](https://docs.rs/bitcoin/latest/bitcoin/p2p/index.html), which provides (de)serialization for protocol messages.
+It will save you a lot of work.
 
-[^5]: See [service flags](https://github.com/bitcoin/bitcoin/blob/dfb7d58108daf3728f69292b9e6dba437bb79cc7/src/protocol.h#L309)
+### 🔌 Connecting to the network
 
-[^6]: The handshake process can involve other messages depending on what our client signals in its initial `version` message. 
-See the [ProcessMessage](https://github.com/bitcoin/bitcoin/blob/dbc450c1b59b24421ba93f3e21faa8c673c0df4c/src/net_processing.cpp#L3715) function.
+Open a TCP socket to `seed.bitcoin.sipa.be`, not a raw IP.
 
+When you use a domain name in `TcpStream::connect`, the operating system performs a DNS lookup and returns a list of candidate socket addresses (IPv4 and IPv6).
+Rust gives you an iterator over these addresses—explore what it contains!
 
-Now it's time to implement something.
+Use this as a moment to practice key Rust concepts:
 
-## Task
+- What exactly does `TcpStream::connect("seed.bitcoin.sipa.be:8333")` return?
+- What kind of `Result` type do you get?
+- Can you inspect and print the resolved IPs before connecting?
 
-Write a Bitcoin client that connects to a public node using TCP.
+📘 To guide your exploration, revisit:
 
-1. The IP address of the public node can be hardcoded for now (we are changing that later).
-You can gather one using `dig seed.bitcoin.sipa.be`.
+- [Chapter 6: Enums and Pattern Matching](https://doc.rust-lang.org/book/ch06-00-enums.html)
+- [Chapter 9: Error Handling](https://doc.rust-lang.org/book/ch09-00-error-handling.html)
+- [Section 13.2: Iterators](https://doc.rust-lang.org/book/ch13-02-iterators.html)
 
-2. Your client should perform the correct Bitcoin P2P protocol handshake.
+> Bonus:
+> Try printing all resolved addresses before selecting one.
+> What types do you see?
 
-3.  It is common for highly connected nodes to disconnect right after the handshake.
-You can check it by [`peek`](https://doc.rust-lang.org/std/net/struct.TcpStream.html#method.peek)ing the `TcpStream`.
+### 🤝 Perform the handshake
 
-- Your client should respond to `ping` messages otherwise the remote node will disconnect.
-- To start receiving addresses of other nodes, send a `getaddr` message.
-You should receive `addr` messages from time to time.
-- Print sent and received messages to the terminal using `println!()` (we are upgrading this later).
-Ignore received `inv` messages.`
+- What message does your client need to send first?
+- What responses should it expect?
+- How does your client know the handshake was successful?
 
-The [bitcoin crate](https://github.com/rust-bitcoin/rust-bitcoin) provides a `p2p` module which can (de)serialize network messages.
-Use it in your favor.
+Basic sequence:
+1. Send `version`
+2. Receive `version` and `verack`
+3. Send `verack` to complete the handshake.
+See [ProcessMessage](https://github.com/bitcoin/bitcoin/blob/dbc450c1b59b24421ba93f3e21faa8c673c0df4c/src/net_processing.cpp#L3715)
 
-## Useful tools
+### ⏱️ Handle connection stability
 
-1. [`dig`](https://linux.die.net/man/1/dig) – DNS lookup utility
-2. [`nc`](https://linux.die.net/man/1/nc) – arbitrary TCP and UDP connections and listens.
+- Some nodes may disconnect right after the handshake. Try using [`TcpStream::peek`](https://doc.rust-lang.org/std/net/struct.TcpStream.html#method.peek) to detect if the socket is still open.
+- What happens if your client ignores a `ping` message?
+
+Your client should:
+- Reply to `ping` with `pong`
+- Send a `getaddr` message to request peers
+- Receive and handle `addr` messages
+
+### 🖨️ Print all communication
+
+- Use simple `println!()` calls to print every message your client sends and receives.
+- Don’t worry about proper logging for now—we’ll design and implement structured logging facilities in a later task.
+
+You are going to design and implement proper logging for your program.
+For now, think about how you would design:
+
+- What information should be included in a useful log line?
+- How would you distinguish between incoming and outgoing messages?
+- How would you format logs to be readable, but also machine-parseable later?
+
+Focus on the essentials:
+- Understand how Bitcoin protocol messages are exchanged.
+- Get comfortable working with TCP streams and binary message framing.
+
+> 💡 This task includes all the Bitcoin protocol logic you'll implement in the seminar.
+> The remaining tasks will tackle broader systems concerns like storage, concurrency, DNS, and interface design.
+
+---
+
+## Questions to Guide You
+
+- What information is exchanged during the handshake?
+- What assumptions does the protocol make about trust or encryption?
+- What challenges arise from parsing structured messages over a raw TCP stream?
+- What can you infer from the peer’s response to `getaddr`?
+
+---
+
+## Tools that may help
+
+- [`dig`](https://linux.die.net/man/1/dig) – to inspect DNS seeders  
+- [`nc`](https://linux.die.net/man/1/nc) – to manually probe TCP connections  
+
+---
+
 ## References
 
-1. https://en.bitcoin.it/wiki/Protocol_documentation
-2. https://developer.bitcoin.org/devguide/index.html
-
+- [Bitcoin P2P Protocol Wiki](https://en.bitcoin.it/wiki/Protocol_documentation)  
+- [Bitcoin Developer Reference](https://developer.bitcoin.org/devguide/index.html)
