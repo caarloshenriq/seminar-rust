@@ -37,13 +37,13 @@ Given the dynamic nature of a P2P network in which nodes can come and go at any 
 
 A Bitcoin DNS Seeder is a Bitcoin client that actively connects to nodes on the P2P network and retrieve peers addresses, trying to connect to them as well[^4].
 The seeder maintains a database of known addresses that can be filtered by known (I have heard about them), active (I have succesfully connected to them), and inactive (I couldn't connect to them).
-You can figure out other statuses, e.g., ban an address know to misbehave.
+You can figure out other statuses, e.g., ban an address know to misbehave [^5].
 The seeder also acts as a DNS server that provides `A` records in response to a DNS query.
 See the example below (your results will probably differ as the reported set of known addresses is randomized).
 
-[^4]: The seeder also suffers from the bootstraping problem as you will see. 
-The first seeders were fed addresses manually and are running since the early ages of the Bitcoin network, keeping their databases up to date. 
-We are going to use an existing seeder to bootstrap ours.
+[^4]: The seeder also suffers from the bootstraping problem as you will see. The first seeders were fed addresses manually and are running since the early ages of the Bitcoin network, keeping their databases up to date. We are going to use an existing seeder to bootstrap ours.
+
+[^5]: See Provoost, S. **Bitcoin: A Work in Progress** chapters 7 (Eclispe attacks) and 8 (Fake nodes).
 
 ```bash
 ❯ dig seed.bitcoin.sipa.be
