@@ -26,7 +26,7 @@ The network messages follow a common structure[^3]:
 
 - **magic**: 4 bytes indicating message origin network, and used to seek to next message when stream state is unknown;
 - **command**: 12 bytes with a NULL padded ASCII string identifying the packet content;
-- **payload**: 4 bytes indicating the length of payload in number of bytes (can be zero for messages with no payload);
+- **payload_size**: 4 bytes indicating the length of payload in number of bytes (can be zero for messages with no payload);
 - **checksum**: first 4 bytes of sha256(sha256(payload));
 - **payload**: actual data, if any.
 
