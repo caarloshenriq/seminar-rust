@@ -71,7 +71,7 @@ You can gather one using `dig seed.bitcoin.sipa.be`.
 2. Your client should perform the correct Bitcoin P2P protocol handshake.
 
 3.  It is common for highly connected nodes to disconnect right after the handshake.
-You can check it by `peek`ing the `TcpStream`.
+You can check it by [`peek`](https://doc.rust-lang.org/std/net/struct.TcpStream.html#method.peek)ing the `TcpStream`.
 
 - Your client should respond to `ping` messages otherwise the remote node will disconnect.
 - To start receiving addresses of other nodes, send a `getaddr` message.
@@ -84,9 +84,8 @@ Use it in your favor.
 
 ## Useful tools
 
-1. `dig` – DNS lookup utility
-2. `nc` – arbitrary TCP and UDP connections and listens
-
+1. [`dig`](https://linux.die.net/man/1/dig) – DNS lookup utility
+2. [`nc`](https://linux.die.net/man/1/nc) – arbitrary TCP and UDP connections and listens.
 ## References
 
 1. https://en.bitcoin.it/wiki/Protocol_documentation
