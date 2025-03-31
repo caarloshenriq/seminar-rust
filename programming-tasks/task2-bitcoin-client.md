@@ -6,7 +6,7 @@ However, contrary to other systems in which the implementations should comply to
 Off course there is some effort in formally specifying certain behaviors by means of [Bitcoin Improvement Proposals](https://github.com/bitcoin/bips) (BIPS), but it is correct to say that, for the most part, the correct behavior in the network is whatever Bitcoin Core does in a certain situation, i.e., the software implementation is the specification.
 This is quite unfortunate because it forces us to study the Bitcoin Core source code in case things don't work as expected.
 To encourage you to do so, we included references to relevant parts of the Bitcoin Core source code when appropriate[^1].
-Also, that's why developing well designed and tested libraries is so important for the Bitcoin ecossystem.
+Also, that's why developing well designed and tested libraries is so important for the Bitcoin ecosystem.
 
 [^1]: You came to learn Rust in a Bitcoin context, and since Rust tries to fit in the same niche as C++, studying a complex C++ code base will be beneficial.
 
@@ -76,7 +76,7 @@ You can check it by `peek`ing the `TcpStream`.
 - Your client should respond to `ping` messages otherwise the remote node will disconnect.
 - To start receiving addresses of other nodes, send a `getaddr` message.
 You should receive `addr` messages from time to time.
-- Print sent and received messages to the terminal using `println()` (we are upgrading this later).
+- Print sent and received messages to the terminal using `println!()` (we are upgrading this later).
 Ignore received `inv` messages.`
 
 The [bitcoin crate](https://github.com/rust-bitcoin/rust-bitcoin) provides a `p2p` module which can (de)serialize network messages.
