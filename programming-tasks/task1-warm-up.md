@@ -1,127 +1,162 @@
-# Task 1: Warm up 
+# Task 1: Warm-up
 
-> Bitcoin is structured as a peer-to-peer network architecture on top of the internet.
-> The term peer-to-peer, or P2P, means that the full nodes that participate in the network are peers to each other, that they can all perform the same functions, and that there are no “special” nodes.
-> The network nodes interconnect in a mesh network with a “flat” topology.
+> *“Bitcoin is structured as a peer-to-peer network architecture on top of the internet.
+> The term peer-to-peer, or P2P, means that the full nodes that participate in the network are peers to each other, that they can all perform the same functions, and that there are no ‘special’ nodes.
+> The network nodes interconnect in a mesh network with a ‘flat’ topology.
 > There is no server, no centralized service, and no hierarchy within the network.
-> Nodes in a P2P network both provide and consume services at the same time.[^1]
+> Nodes in a P2P network both provide and consume services at the same time.”*
+> — A. Antonopoulos and D. Harding, *Mastering Bitcoin*[^1]
 
-[^1]: A. Antonopoulos and D. Harding; Mastering Bitcoin.
+The predominant architecture on the internet is the classic **client-server** model.
+In this design, servers and clients serve different purposes:
+servers are typically more powerful, hold privileged data, and handle control over authentication and access.
+Even in apps that allow client-to-client interaction (like messaging systems), those connections are mediated by a server.
+Each client connects to the server, not directly to other clients.
 
-The predominant design of applications on the internet is based on the client-server architecture we all learned to build and love.
-In this kind of design, servers and clients have stark different functions and capabilities.
-Usually, the server is way more capable then the clients, having access to privileged data and controling authentication and access control.
-Even in applications that involve connecting different clients (e.g. messaging systems), these connections are mediated by the server; i.e., both clients establish connections with the server and not among them.
+In a **P2P architecture**, by contrast, all participants—called *nodes*—communicate directly with one another.
+There is no privileged entity, which means nodes must be far more capable than typical clients.
+One of their key responsibilities is to manage peer connections.
+This includes *peer discovery*—learning about new nodes in the network.
 
-In a P2P architecture, on the other hand, the participants are called *nodes* and they connect and talk directly to each other.
-Because there's no privileged entity on the system, nodes are usually way more sophisticated than clients.
-One of the tasks they have to perform is to manage the connections with other nodes (its peers).
-It is common to include discovery mechanisms so that one node can get acquainted to new nodes.
-
-As you will see in Task 2, the Bitcoin protocol provides such a mechanism by specifying special messages that are used to ask for and announce known peers.
-In this way, even if my node is connected to a single peer, it will eventually gather the necessary information[^2] to connect to other peers and improve its reachability in the network.
-But it rests the question: if I'm not already connected to a peer, how can I find addresses to connect to the network?
-We call this process *bootstraping*[^3] into the network.
-
-[^2]: mainly IP addresses for TCP connections, but other transport mechanisms are also used.
-
-[^3]: https://en.wikipedia.org/wiki/Bootstrapping#Etymology
+As you’ll see in Task 2, the Bitcoin protocol includes mechanisms for this. Special messages are used to request and announce known peers. That way, even if your node is connected to just one peer, it can gradually learn about others and expand its network reach[^2]. But that raises an important question: *how does a new node connect to its first peer in the first place?*
+This process is called **bootstrapping**[^3] into the network.
 
 ## Bitcoin DNS Seeders
 
-In regard to what the Bitcoin protocol requires, it is true that there are no special nodes in the Bitcoin network.
-But the practical implementation of the network does rely on specialized nodes that provide services to application clients and to the full nodes themselves.
-Advertising Bitcoin peers addresses is such a service that helps in the bootstraping process of new nodes.
-In the onset of Bitcoin, getting an initial set of node addresses to connect was done in user foruns and on IRC.
-Given the dynamic nature of a P2P network in which nodes can come and go at any moment, as the network grew this process was automatized by DNS Seeders.
+While the Bitcoin protocol doesn’t require “special” nodes, in practice the network does rely on some nodes providing specialized services—for example, helping new nodes bootstrap into the network by advertising known peer addresses.
 
-A Bitcoin DNS Seeder is a Bitcoin client that actively connects to nodes on the P2P network and retrieve peers addresses, trying to connect to them as well[^4].
-The seeder maintains a database of known addresses that can be filtered by known (I have heard about them), active (I have succesfully connected to them), and inactive (I couldn't connect to them).
-You can figure out other statuses, e.g., ban an address know to misbehave [^5].
-The seeder also acts as a DNS server that provides `A` records in response to a DNS query.
-See the example below (your results will probably differ as the reported set of known addresses is randomized).
+In Bitcoin’s early days, nodes discovered peers through online forums or IRC channels.
+As the network grew, this became impractical.
+The solution was **DNS seeders**.
 
-[^4]: The seeder also suffers from the bootstraping problem as you will see. The first seeders were fed addresses manually and are running since the early ages of the Bitcoin network, keeping their databases up to date. We are going to use an existing seeder to bootstrap ours.
+A Bitcoin DNS Seeder is a special node that continually connects to the Bitcoin P2P network, collects peer addresses, attempts to connect to them, and maintains a database of known peers.
+These addresses are categorized—for example, as “known” (seen in the network), “active” (successfully connected), or “inactive” (could not connect).
+Additional statuses like “banned” can also be used for misbehaving peers.
 
-[^5]: See Provoost, S. **Bitcoin: A Work in Progress** chapters 7 (Eclispe attacks) and 8 (Fake nodes).
+The seeder also acts as a **DNS server**, answering queries with random sets of peer IP addresses in `A` records.
+For example:
 
 ```bash
 ❯ dig seed.bitcoin.sipa.be
 
-; <<>> DiG 9.10.6 <<>> seed.bitcoin.sipa.be
-;; global options: +cmd
-;; Got answer:
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 49894
-;; flags: qr rd ra; QUERY: 1, ANSWER: 25, AUTHORITY: 0, ADDITIONAL: 1
-
-;; OPT PSEUDOSECTION:
-; EDNS: version: 0, flags:; udp: 512
-;; QUESTION SECTION:
-;seed.bitcoin.sipa.be.          IN      A
-
 ;; ANSWER SECTION:
 seed.bitcoin.sipa.be.   2455    IN      A       57.129.38.163
 seed.bitcoin.sipa.be.   2455    IN      A       139.177.179.5
-seed.bitcoin.sipa.be.   2455    IN      A       80.228.205.180
-seed.bitcoin.sipa.be.   2455    IN      A       170.187.185.151
-seed.bitcoin.sipa.be.   2455    IN      A       172.236.224.103
-seed.bitcoin.sipa.be.   2455    IN      A       172.104.174.254
-seed.bitcoin.sipa.be.   2455    IN      A       107.139.249.27
-seed.bitcoin.sipa.be.   2455    IN      A       188.192.229.52
-seed.bitcoin.sipa.be.   2455    IN      A       172.104.130.244
-seed.bitcoin.sipa.be.   2455    IN      A       218.154.213.62
-seed.bitcoin.sipa.be.   2455    IN      A       80.181.229.24
-seed.bitcoin.sipa.be.   2455    IN      A       123.100.246.115
-seed.bitcoin.sipa.be.   2455    IN      A       157.173.107.70
-seed.bitcoin.sipa.be.   2455    IN      A       88.10.254.88
-seed.bitcoin.sipa.be.   2455    IN      A       98.251.47.34
-seed.bitcoin.sipa.be.   2455    IN      A       90.240.33.39
-seed.bitcoin.sipa.be.   2455    IN      A       13.126.144.12
-seed.bitcoin.sipa.be.   2455    IN      A       34.102.53.81
-seed.bitcoin.sipa.be.   2455    IN      A       184.162.157.34
-seed.bitcoin.sipa.be.   2455    IN      A       66.163.223.241
-seed.bitcoin.sipa.be.   2455    IN      A       123.100.246.236
-seed.bitcoin.sipa.be.   2455    IN      A       172.105.193.102
-seed.bitcoin.sipa.be.   2455    IN      A       45.33.125.229
-seed.bitcoin.sipa.be.   2455    IN      A       203.11.72.160
-seed.bitcoin.sipa.be.   2455    IN      A       139.162.150.59
-
-;; Query time: 47 msec
-;; SERVER: 8.8.8.8#53(8.8.8.8)
-;; WHEN: Mon Mar 24 16:34:02 -03 2025
-;; MSG SIZE  rcvd: 449
+... (other IPs) ...
 ```
 
-The oldest known implementation, called the [Bitcoin Seeder](https://github.com/sipa/bitcoin-seeder), was developed by Pieter Wuille and [hardcoded into Bitcoin Core](https://github.com/bitcoin/bitcoin/blob/dbc450c1b59b24421ba93f3e21faa8c673c0df4c/src/kernel/chainparams.cpp#L145) in 2011.
-There are other implementations around, including a Rust one, but I recommend you don't look for them.
-The idea is that you don't get biased when writing your own port in Rust.
+The oldest known implementation, [Bitcoin Seeder](https://github.com/sipa/bitcoin-seeder), was created by Pieter Wuille and has been [hardcoded into Bitcoin Core](https://github.com/bitcoin/bitcoin/blob/dbc450c1b59b24421ba93f3e21faa8c673c0df4c/src/kernel/chainparams.cpp#L145) since 2011.
+There are other implementations today—including some in Rust—but we encourage you not to look at them.
+The goal is to understand the functionality and reimplement it yourself without bias.
 
-## Tasks
+---
 
-### Install and get acquainted with the Rust toolchain
+## Your Tasks
 
-- Study chapters 1, 2, 3, and 7 of the [Rust Book](https://doc.rust-lang.org/stable/book/title-page.html).
+### 1. Install and get acquainted with the Rust toolchain
 
-### Run the bitcoin seeder
+- Study Chapters 1, 2, 3, and 7 of [The Rust Book](https://doc.rust-lang.org/stable/book/title-page.html).
 
-- Compile and run the [Bitcoin Seeder](https://github.com/sipa/bitcoin-seeder).
-Your goal is to reimplement this thing, thus get familiar to what it's doing.
-- Study it's source code and get a feel for how it is structured.
-Try to identify weak points that can be improved in your implementation (e.g. how does the database component is implemented?).
+### 2. Run the Bitcoin Seeder
 
-### Get acquainted to DNS
+Clone, build, and run Pieter Wuille’s [Bitcoin Seeder](https://github.com/sipa/bitcoin-seeder).
+Your goal at this stage is not to understand every detail, but to get a feel for what the software does, how it behaves at runtime, and how it communicates with the outside world.
 
-You are going to interact and implement a DNS server in future tasks.
-So, it's a good idea to get aquaincted to what's a DNS server, DNS queries and DNS records.
-You don't need to understand the whole complexity of modern DNS systems, just the basics of how the protocol works.
+Use the following questions to guide your exploration:
 
-- The [Domain Name System Wikipedia entry](https://en.wikipedia.org/wiki/Domain_Name_System) is a good starting point.
-- See also the original specifications in [RFC 1034](https://datatracker.ietf.org/doc/html/rfc1034) and [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035).
+#### 🧠 General Behavior
 
-### Get acquainted to the Bitcoin P2P protocol
+- What do you see in the terminal when the seeder starts? What kinds of activities does it log?
+- Can you identify distinct phases or responsibilities (e.g., peer discovery, DNS service, logging)?
+- What configuration options or runtime flags does the software support?
 
-Get best reference is probably the [Bitcoin Wiki](https://en.bitcoin.it/wiki/Protocol_documentation#getaddr).
+#### 🔍 Interactive Observation
 
-### A word of warning
+- Use `dig` to query your local seeder (e.g., `dig @127.0.0.1 example.seed.local`).
+  What kind of response do you get?
+- Does the seeder log anything when a DNS query is received?
+- What kind of information does it return in the DNS reply? Are the IPs random? Are they actual peers?
 
-These are easy tasks to get you up and running, but don't get fooled: this seminar is designed to be challenging and the next tasks are going to be way more challenging.
+#### 🧠 Reflection
+
+- Based on what you’ve observed, what services is the seeder providing?
+- What signals is it giving you about its internal state—number of peers, health, errors?
+- What do you *wish* it told you that it currently doesn’t?
+
+### 3. Explore the Bitcoin Seeder’s Internal Structure
+
+The Bitcoin Seeder is a multi-threaded application. Rather than a central loop controlling all behavior, it delegates work to specialized threads that run concurrently.
+
+As you explore the codebase, try to answer the following:
+
+#### 🧵 Concurrency and Threads
+
+- What kinds of tasks run in parallel (e.g., DNS, peer probing, logging)?
+- Where in the code are threads created, and why?
+- Do threads appear to be long-lived or created on demand? How does the program manage their lifecycle?
+
+#### 🗃️ State and Data Management
+
+- What data structures are used to track peers? Are they easy to work with? Efficient?
+- Is the database implementation something you’d reuse? If not, why?
+  What would you do differently in Rust?
+
+#### 🔍 Design Reflection
+
+- Do any parts of the implementation feel overly complex or tightly coupled?
+- What would you want to improve if you had to maintain or extend this codebase?
+
+> Bonus: Try sketching a simple block diagram of how different parts of the system (DNS server, peer database, logger) interact.
+
+---
+
+### 4. Get acquainted with DNS
+
+Later in the seminar, you’ll build your own DNS server—so now’s the time to get comfortable with the basics of how DNS works.
+
+Focus on these questions as you explore:
+
+#### 🌐 What is DNS?
+
+- What is the basic role of the Domain Name System (DNS) in the internet stack?
+- What happens when you type a domain name into a browser?
+
+#### 🧾 What are DNS records?
+
+- What are `A` and `AAAA` records? Why are they important for our project?
+- What’s the difference between a DNS query and a DNS response?
+
+#### 🧠 From Concept to Practice
+
+- How do you perform a DNS query from the terminal (e.g., using `dig`)?
+- Can you imagine how your software will handle multiple queries at once?
+
+Start light:
+
+- [Wikipedia: Domain Name System](https://en.wikipedia.org/wiki/Domain_Name_System)
+- [RFC 1034](https://datatracker.ietf.org/doc/html/rfc1034) and [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035) — just skim the opening sections to get the high-level picture.
+
+> You don’t need to master the full DNS protocol—just understand what it is, how queries and responses work, and why it's relevant to our seeder.
+
+---
+
+### 5. Get acquainted with the Bitcoin P2P protocol
+
+Start with the [Bitcoin Wiki section on the protocol](https://en.bitcoin.it/wiki/Protocol_documentation#getaddr), especially how nodes exchange addresses (`getaddr`, `addr` messages).
+
+---
+
+## A Word of Warning
+
+These first tasks are designed to get you set up and to think critically about what you are doing.
+They seem quite easy and you might want to skip thinking—but don’t be fooled.
+The difficulty will ramp up quickly.
+This seminar is meant to be challenging and rewarding.
+The more you think about what you are doing, the more you will learn.
+Prepare to dive deep.
+
+---
+
+[^1]: A. Antonopoulos and D. Harding; *Mastering Bitcoin*
+[^2]: Mainly IP addresses for TCP connections, though other transport layers exist.
+[^3]: [Bootstrapping – Wikipedia](https://en.wikipedia.org/wiki/Bootstrapping#Etymology)
