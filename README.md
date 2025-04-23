@@ -1,69 +1,80 @@
 # Rusting Bitcoin Seminar by Vinteum
 
 Welcome to the Rusting Bitcoin Seminar by Vinteum.
-This is a 8-week seminar designed to help you develop skills in the Rust programming language in a Bitcoin context.
+This is an 8-week seminar designed to help you develop skills in the Rust programming language within the context of the Bitcoin ecosystem.
 
 ## Hands-on methodology
 
-Around 88% of programmers prefer to learn a new language or concept by implementing something with it[^1].
-So, the first and foremost component of the Rusting Bitcoin Seminar is a set of 8 programming activities designed so that you implement a non-trivial piece of software from scratch using the many features of the Rust language.
+Around 88% of programmers prefer to learn a new language or concept by building something with it[^1].
+So, the primary component of the Rusting Bitcoin Seminar is a set of eight programming activities.
+These are designed to guide you through implementing a non-trivial piece of software from scratch using many of Rust's core features.
 
-Step by step, you'll implement your version of the [Bitcoin Seeder](https://github.com/sipa/bitcoin-seeder), a piece of software that helps Bitcoin Nodes to bootstrap into the Bitcoin network by providing addresses of other active nodes.
-This is a sufficiently simple piece of software to be implemented in a few weeks, while being sufficiently complex to push you forward.
+Step by step, you’ll build your own version of the [Bitcoin Seeder](https://github.com/sipa/bitcoin-seeder)—a tool that helps new Bitcoin nodes discover active peers and bootstrap into the network by providing IP addresses of reachable nodes.
+This project strikes a balance:
+it’s simple enough to complete within a few weeks, yet complex enough to challenge and expand your skills.
 
 ## Systems programming focus
 
-Most programmers work in application development[^2], producing and maintaining software which provides services to the users directly.
-As a consequence, the programming languages they employ (Javascript, Java, C#, etc) tend to focus on generic features to allow programs written in the language to use the same code on different platforms, trading fine control over the computer resources for generality, convenience and safety.
+Most developers work in *application development*[^2], building software that delivers services directly to end users.
+As a result, the languages they typically use (like JavaScript, Java, or C#) prioritize portability and safety over low-level control.
 
-In constrast, *systems programming* aims to produce software which provide services to other software, are performance constrained, or both (e.g. operating systems, database management systems, networking systems, embedded systems).
-Rust is designed as a systems programming language focusing not in compatibility (one code to rule all architectures), but in performance and ease of access to the underlying hardware while still providing high-level programming concepts.
+By contrast, *systems programming* involves writing software that provides services to other software, operates under performance constraints, or both—think operating systems, databases, networking stacks, or embedded firmware.
+Rust is a modern systems programming language.
+It emphasizes control over hardware and performance without sacrificing safety and expressiveness, thanks to its powerful type system.
 
-Off course we want and need plenty of applications to be built on top of Bitcoin.
-But when we talk about Bitcoin development we are often refering to the implementation of *communication protocols*, a typical systems programming task.
+Of course, we need robust applications built on top of Bitcoin.
+But when we talk about *Bitcoin development*, we’re often referring to implementing *communication protocols*—a classic systems programming challenge.
 
-This division between application and systems programming langauges have blurred over time and you surely can write applications in Rust, but the language is designed to exposed and provide control mechanisms over aspects often abstracted away in languages focused on application development, primarily *memory management*, *data representation*, and *concurrency*.
-Rust does so by means of a powerful *type system* that provides static (compile time) guarantees.
+Rust bridges both worlds:
+while it supports writing full-featured applications, it was specifically designed to expose and control features often abstracted away in application-focused languages—especially *memory management*, *data representation*, and *concurrency*.
 
-- Rust's type system is based on the [Hindley–Milner type system](https://en.wikipedia.org/wiki/Hindley–Milner_type_system) which corresponds to a certain logic[^3].
-In practice, we can use types to describe the domain of the problem we are trying to solve and use the compiler to check our work.
+Here’s what makes Rust stand out:
 
-- Rust has a system of *traits* and instances that extend its polymorphism capabilities that’s almost directly copied from Haskell typeclasses, which even supports fancy features like associated types.
+- Rust’s type system is based on the [Hindley–Milner type system](https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system), which corresponds to a logical foundation[^3].
+In practice, this means you can use types to describe your problem domain and rely on the compiler to verify correctness.
+  
+- It features *traits* and trait implementations, extending polymorphism in a way inspired by Haskell’s typeclasses—supporting advanced features like associated types.
 
-- Rust's type system is linear, which enforces that values are "used once."
-The *borrow checker** guarantee you can have any number of immutable references to an object, or one mutable reference, but never both.
-This gives Rust the ability to generate very efficient and memory-safe code and also equips Rust with a first-class notion of mutability.
-This can be a pain to get used to, but is an extremely liberating discipline.
+- Rust’s type system is *linear*, meaning values must be “used once.” The **borrow checker** ensures you can have many immutable references or a single mutable one—but never both at the same time.
+This enables Rust to produce efficient, memory-safe code and gives you a first-class notion of mutability.
+It can be tricky to get used to, but it’s an extremely liberating discipline.
 
-To account for these unique features, the second component of the Seminar is a series of 8 lectures that discuss theoretical and practical aspects of Rust.
+## Our Learning Philosophy
+
+This seminar takes a flipped-classroom approach:
+the lectures are not the main event.
+Instead, they serve as optional touchpoints to reinforce ideas, clarify concepts, and open space for discussion.
+The real learning happens through doing—by tackling each week's programming challenge and exploring the references on your own.
+Think of the seminar as guided self-study, with just enough structure and support to keep you moving forward.
+
+To support this methodology, the seminar also includes a series of eight lectures.
+These sessions are opportunities to delve deeper into both theoretical and practical aspects of Rust and systems programming, helping you connect ideas, ask questions, and share your progress with others.
 
 ## References
 
-**Books on Rust**
+### Books on Rust
 
-1. [The Rust Book](https://doc.rust-lang.org/stable/book/):
-the official Rust learning resource.
-2. [Jim Blandy et al; Programming Rust, 3rd Edition](https://www.oreilly.com/library/view/programming-rust-3rd/9781098176228/):
-practical and comprehensive book covering all aspects of Rust for systems programming.
-3. [Ken Youens-Clark; Command-Line Rust](https://www.oreilly.com/library/view/command-line-rust/9781098109424/):
-   learn Rust by recreating classical unix command line tools like `grep`, `ls`,
-   and `tail**.
+1. [The Rust Book](https://doc.rust-lang.org/stable/book/)
+   The official Rust learning resource.
+2. [Jim Blandy et al; *Programming Rust*, 3rd Edition](https://www.oreilly.com/library/view/programming-rust-3rd/9781098176228/)
+   A practical and comprehensive guide to Rust for systems programming.
+3. [Ken Youens-Clark; *Command-Line Rust*](https://www.oreilly.com/library/view/command-line-rust/9781098109424/)
+   Learn Rust by recreating classical Unix command-line tools like `grep`, `ls`, and `tail`.
 
-**Books on Bitcoin**
+### Books on Bitcoin
 
-1. [A. Antonopoulos and D. Harding; Mastering Bitcoin](https://github.com/bitcoinbook/bitcoinbook?tab=readme-ov-file):
-the unofficial Bitcoin book.
-2. [Jimmy Song; Programming Bitcoin](https://www.oreilly.com/library/view/programming-bitcoin/9781492031482/):
-learn the Bitcoin protocol by implementing it yourself (a little outdated, but still excellent for learning the basics of the protocol).
+1. [Andreas Antonopoulos and David Harding; *Mastering Bitcoin*](https://github.com/bitcoinbook/bitcoinbook?tab=readme-ov-file)
+   The unofficial go-to book for understanding Bitcoin.
+2. [Jimmy Song; *Programming Bitcoin*](https://www.oreilly.com/library/view/programming-bitcoin/9781492031482/)
+   Learn the Bitcoin protocol by implementing it yourself. A bit dated, but still great for learning the fundamentals.
 
-**Other resources**
+### Other resources
 
 1. [Awesome Rust](https://github.com/rust-unofficial/awesome-rust)
 2. [Awesome Bitcoin](https://github.com/igorbarinov/awesome-bitcoin)
 
+---
 
-[^1]: "I only believe in statistics that I doctored myself." &mdash; Winston Churchill
-
-[^2]: "There are two kinds of statistics, the kind you look up and the kind you make up." &mdash; Rex Stout
-
-[^3]: [Philip Wadler, Propositions as Types](https://homepages.inf.ed.ac.uk/wadler/papers/propositions-as-types/propositions-as-types.pdf)
+[^1]: "I only believe in statistics that I doctored myself." — Winston Churchill
+[^2]: "There are two kinds of statistics, the kind you look up and the kind you make up." — Rex Stout
+[^3]: [Philip Wadler, *Propositions as Types*](https://homepages.inf.ed.ac.uk/wadler/papers/propositions-as-types/propositions-as-types.pdf)
