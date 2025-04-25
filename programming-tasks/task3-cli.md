@@ -50,7 +50,7 @@ You will redesign your Bitcoin client to accept arguments and options from the c
 Start by examining the command-line interface of Pieter Wuille’s [Bitcoin Seeder](https://github.com/sipa/bitcoin-seeder):
 
 - Read the README for a high-level overview.
-- Run the seeder with `--help` and observe the available options.
+- Run the seeder with `-?` and observe the available options.
 
 Then reflect on:
 
