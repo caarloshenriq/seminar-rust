@@ -1,0 +1,8 @@
+[package]
+name = "btc-client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitcoin = "0.32.8"
+hickory-resolver = "0.25.2"
