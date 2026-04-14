@@ -22,9 +22,9 @@ pub fn recv_message(stream: &mut TcpStream) -> io::Result<RawNetworkMessage> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
-    use bitcoin::p2p::message::NetworkMessage;
     use bitcoin::consensus::{Decodable, Encodable};
+    use bitcoin::p2p::message::NetworkMessage;
+    use std::io::Cursor;
 
     fn encode_message(magic: Magic, msg: NetworkMessage) -> Vec<u8> {
         let raw = RawNetworkMessage::new(magic, msg);
