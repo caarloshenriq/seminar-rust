@@ -1,17 +1,19 @@
 use std::io;
-use std::net::TcpStream;
+use std::net::{SocketAddr, TcpStream};
 use std::time::Duration;
 
-use bitcoin::p2p::Magic;
 use bitcoin::p2p::message::NetworkMessage;
+use bitcoin::p2p::Magic;
 
 use super::codec::{recv_message, send_message};
 
-pub fn run(stream: &mut TcpStream, magic: Magic) -> io::Result<()> {
+pub fn run(stream: &mut TcpStream, magic: Magic) -> io::Result<Vec<SocketAddr>> {
     stream.set_read_timeout(Some(Duration::from_secs(30)))?;
 
     send_message(stream, magic, NetworkMessage::GetAddr)?;
     println!("[SEND] getaddr\n");
+
+    let mut discovered: Vec<SocketAddr> = Vec::new();
 
     loop {
         let mut buf = [0u8; 1];
@@ -21,7 +23,7 @@ pub fn run(stream: &mut TcpStream, magic: Magic) -> io::Result<()> {
                 break;
             }
             Err(ref e) if is_timeout(e) => {
-                println!("[INFO] Timeout — peer inactive, finishing...");
+                println!("[INFO] Timeout — peer idle, disconnecting.");
                 break;
             }
             Err(e) => return Err(e),
@@ -31,7 +33,7 @@ pub fn run(stream: &mut TcpStream, magic: Magic) -> io::Result<()> {
         let raw = match recv_message(stream) {
             Ok(m) => m,
             Err(ref e) if is_timeout(e) => {
-                println!("[INFO] Timeout upon receiving the message.");
+                println!("[INFO] Timeout receiving message.");
                 break;
             }
             Err(e) => return Err(e),
@@ -47,17 +49,19 @@ pub fn run(stream: &mut TcpStream, magic: Magic) -> io::Result<()> {
                 println!("[RECV] pong  nonce={}", nonce);
             }
             NetworkMessage::Addr(addrs) => {
-                println!("[RECV] addr  {} address(es):", addrs.len());
+                println!("[RECV] addr  {} address(es)", addrs.len());
                 for (_, addr) in &addrs {
                     if let Ok(sa) = addr.socket_addr() {
-                        println!("         {}", sa);
+                        discovered.push(sa);
                     }
                 }
             }
             NetworkMessage::AddrV2(addrs) => {
-                println!("[RECV] addrv2  {} address(es):", addrs.len());
-                for a in &addrs {
-                    println!("         {:?}", a);
+                println!("[RECV] addrv2  {} address(es)", addrs.len());
+                for addr in &addrs {
+                    if let Ok(sa) = addr.socket_addr() {
+                        discovered.push(sa);
+                    }
                 }
             }
             other => {
@@ -66,12 +70,9 @@ pub fn run(stream: &mut TcpStream, magic: Magic) -> io::Result<()> {
         }
     }
 
-    Ok(())
+    Ok(discovered)
 }
 
 fn is_timeout(e: &io::Error) -> bool {
-    matches!(
-        e.kind(),
-        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
-    )
+    matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut)
 }
