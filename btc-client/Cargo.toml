@@ -8,3 +8,4 @@ bitcoin = "0.32.8"
 clap = { version = "4", features = ["derive"] }
 hickory-resolver = "0.25.2"
 rusqlite = { version = "0.39.0", features = ["bundled"] }
+tokio    = { version = "=1.36.0", features = ["full"] }
