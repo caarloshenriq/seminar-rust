@@ -141,6 +141,46 @@ impl PeerStore {
             .query_row("SELECT COUNT(*) FROM peers", [], |row| row.get(0))?;
         Ok(count as u64)
     }
+
+    pub fn load_never_tried(&self) -> Result<Vec<PeerInfo>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT ip, port, services, status, source, first_seen, last_attempt, last_success, attempt_count
+             FROM peers
+             WHERE status = 'NeverTried'
+             ORDER BY first_seen DESC
+             LIMIT 50"
+        )?;
+
+        let peers = stmt.query_map([], |row| {
+            let ip: String = row.get(0)?;
+            let port: u16 = row.get(1)?;
+            let services: i64 = row.get(2)?;
+            let status: String = row.get(3)?;
+            let source: String = row.get(4)?;
+            let first_seen: i64 = row.get(5)?;
+            let last_attempt: Option<i64> = row.get(6)?;
+            let last_success: Option<i64> = row.get(7)?;
+            let attempt_count: u32 = row.get(8)?;
+
+            let ip: std::net::IpAddr = ip.parse().map_err(|_| rusqlite::Error::InvalidQuery)?;
+            let addr = SocketAddr::new(ip, port);
+
+            Ok(PeerInfo {
+                addr,
+                services: bitcoin::p2p::ServiceFlags::from(services as u64),
+                status: str_to_status(&status),
+                source: str_to_source(&source),
+                first_seen: first_seen as u64,
+                last_attempt: last_attempt.map(|t| t as u64),
+                last_success: last_success.map(|t| t as u64),
+                attempt_count,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+        Ok(peers)
+    }
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

@@ -1,163 +1,162 @@
 mod cli;
 mod dns;
+mod logger;
 mod network;
 mod peer;
 
 use std::net::SocketAddr;
 use std::path::Path;
-use std::time::Duration;
 
 use bitcoin::p2p::Magic;
 use clap::Parser;
 use tokio::net::TcpStream;
-use tokio::time::timeout;
 
-use peer::db_actor::{DbHandle, self as db_actor};
+use logger::event::{Event, LogLevel, Subsystem};
 use peer::model::{PeerInfo, PeerSource};
 use peer::store::PeerStore;
 
 const MAGIC: Magic = Magic::BITCOIN;
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-
-// ── Entry point ───────────────────────────────────────────────────────────────
 
 #[tokio::main]
 async fn main() {
     let args = cli::Cli::parse();
 
-    println!("=== btc-client ===\n");
-    println!("[CFG] host        = {}", args.host);
-    println!("[CFG] port        = {}", args.port);
-    println!("[CFG] seeder_port = {}", args.seeder_port);
-    println!("[CFG] threads     = {}", args.threads);
-    println!("[CFG] timeout     = {}s", args.timeout);
-    println!("[CFG] logfile     = {}", args.logfile.as_deref().unwrap_or("none"));
-    println!();
+    let min_level = match args.verbosity {
+        cli::Verbosity::Trace => LogLevel::Trace,
+        cli::Verbosity::Debug => LogLevel::Debug,
+        cli::Verbosity::Info  => LogLevel::Info,
+        cli::Verbosity::Warn  => LogLevel::Warn,
+        cli::Verbosity::Error => LogLevel::Error,
+    };
 
-    // ── Spawn the DB actor (owns SQLite, runs in its own thread) ──────────────
-    let db_path = Path::new("peers.db");
-    let (db, _db_thread) = db_actor::spawn(db_path);
+    let (log, _log_handle) = logger::spawn(min_level);
 
-    // Quick read-only access to seed the first round of peers (before tasks start)
-    let store = PeerStore::open(db_path).expect("Failed to open peer database");
-    println!("[DB] Opened peers.db ({} peers known)\n", store.count().unwrap_or(0));
+    log.info(Subsystem::Cli, Event::Custom(format!(
+        "starting btc-client | host={} port={} seeder_port={}",
+        args.host, args.port, args.seeder_port
+    )));
+
+    let store = PeerStore::open(Path::new("peers.db")).expect("Failed to open peer database");
+    let count = store.count().unwrap_or(0);
+    log.info(Subsystem::Database, Event::DatabaseOpened(count as usize));
 
     let seeder_addr = SocketAddr::from(([127, 0, 0, 1], args.seeder_port));
-    let parallelism = args.threads.max(1) as usize;
 
     loop {
-        // ── Collect candidate addresses ───────────────────────────────────────
-        let known = store.load_reachable().unwrap_or_default();
-
-        let addrs: Vec<SocketAddr> = if !known.is_empty() {
-            println!("[DB] Trying {} known reachable peer(s)...", known.len());
-            known.iter().map(|p| p.addr).take(parallelism * 2).collect()
-        } else {
-            println!("[DNS] No known peers, querying seeder...");
-            match dns::lookup_a(&args.host, seeder_addr) {
-                Ok(ips) => {
-                    let addrs: Vec<SocketAddr> = ips.iter()
-                        .map(|ip| SocketAddr::from((*ip, args.port)))
-                        .collect();
-                    println!("[DNS] Resolved {} address(es)", addrs.len());
-                    addrs
-                }
-                Err(e) => {
-                    println!("[WARN] DNS failed: {}, retrying in 10s...", e);
-                    tokio::time::sleep(Duration::from_secs(10)).await;
-                    continue;
+        // ── Select peers to try ───────────────────────────────────────────────
+        let addrs: Vec<SocketAddr> = {
+            let reachable = store.load_reachable().unwrap_or_default();
+            if !reachable.is_empty() {
+                log.debug(Subsystem::Database, Event::Custom(
+                    format!("trying {} known reachable peer(s)", reachable.len())
+                ));
+                reachable.iter().map(|p| p.addr).collect()
+            } else {
+                let never_tried = store.load_never_tried().unwrap_or_default();
+                if !never_tried.is_empty() {
+                    log.debug(Subsystem::Database, Event::Custom(
+                        format!("trying {} never-tried peer(s) from db", never_tried.len())
+                    ));
+                    never_tried.iter().map(|p| p.addr).collect()
+                } else {
+                    log.info(Subsystem::Dns, Event::Custom("no known peers, querying seeder...".into()));
+                    match dns::lookup_a(&args.host, seeder_addr) {
+                        Ok(ips) => {
+                            log.info(Subsystem::Dns, Event::DnsResolved(args.host.clone(), ips.len()));
+                            ips.iter().map(|ip| SocketAddr::from((*ip, args.port))).collect()
+                        }
+                        Err(e) => {
+                            log.warn(Subsystem::Dns, Event::DnsFailed(args.host.clone(), e.to_string()));
+                            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                            continue;
+                        }
+                    }
                 }
             }
         };
 
-        if addrs.is_empty() {
-            println!("[WARN] No addresses available, retrying in 10s...");
-            tokio::time::sleep(Duration::from_secs(10)).await;
-            continue;
-        }
+        // ── Connect ───────────────────────────────────────────────────────────
+        let connection = {
+            let mut result = None;
+            for addr in &addrs {
+                let mut info = PeerInfo::new(*addr, PeerSource::DnsSeed);
+                match TcpStream::connect(addr).await {
+                    Ok(s) => {
+                        log.info(Subsystem::Network, Event::Connected(*addr));
+                        info.mark_success(bitcoin::p2p::ServiceFlags::NONE);
+                        store.upsert(&info).unwrap();
+                        result = Some((s, *addr));
+                        break;
+                    }
+                    Err(e) => {
+                        log.warn(Subsystem::Network, Event::FailedConnection(*addr, e.to_string()));
+                        info.mark_attempt();
+                        store.upsert(&info).unwrap();
+                    }
+                }
+            }
+            result
+        };
 
-        // ── Spawn parallel crawl tasks ────────────────────────────────────────
-        let batch: Vec<SocketAddr> = addrs.into_iter().take(parallelism).collect();
-        println!("[CRAWL] Spawning {} parallel crawl task(s)...\n", batch.len());
+        let (mut stream, peer_addr) = match connection {
+            Some(c) => c,
+            None => {
+                log.warn(Subsystem::Network, Event::Custom("no address reachable, retrying in 10s".into()));
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                continue;
+            }
+        };
 
-        let handles: Vec<_> = batch
-            .into_iter()
-            .map(|addr| {
-                let db = db.clone();
-                tokio::spawn(async move {
-                    crawl_peer(addr, db).await;
-                })
-            })
-            .collect();
+        // ── Handshake ─────────────────────────────────────────────────────────
+        match network::handshake::perform_handshake(&mut stream, MAGIC, peer_addr).await {
+            Ok(v) => {
+                log.info(Subsystem::Network, Event::HandshakeComplete(
+                    peer_addr,
+                    v.user_agent.clone(),
+                    v.start_height,
+                ));
 
-        // Wait for all tasks in this batch to finish
-        for h in handles {
-            let _ = h.await;
-        }
-
-        println!("\n[CRAWL] Batch complete. Total peers: {}", store.count().unwrap_or(0));
-        tokio::time::sleep(Duration::from_secs(5)).await;
-    }
-
-    // (unreachable in normal operation, but good practice)
-    #[allow(unreachable_code, unused_variables)]
-    {
-        db.shutdown();
-        let _ = _db_thread.join();
-    }
-}
-
-// ── Crawl a single peer ───────────────────────────────────────────────────────
-
-async fn crawl_peer(addr: SocketAddr, db: DbHandle) {
-    println!("[{}] Connecting...", addr);
-
-    // ── TCP connect with timeout ──────────────────────────────────────────────
-    let mut stream = match timeout(CONNECT_TIMEOUT, TcpStream::connect(addr)).await {
-        Ok(Ok(s)) => {
-            println!("[{}] Connected ✓", addr);
-            db.mark_reachable(addr, bitcoin::p2p::ServiceFlags::NONE);
-            s
-        }
-        Ok(Err(e)) => {
-            println!("[{}] Connection failed: {}", addr, e);
-            db.mark_unreachable(addr);
-            return;
-        }
-        Err(_) => {
-            println!("[{}] Connection timed out", addr);
-            db.mark_unreachable(addr);
-            return;
-        }
-    };
-
-    // ── Handshake ─────────────────────────────────────────────────────────────
-    let peer_ver = match network::handshake::perform_handshake(&mut stream, MAGIC, addr).await {
-        Ok(v) => {
-            println!("[{}] agent='{}' height={}", addr, v.user_agent, v.start_height);
-            db.mark_reachable(addr, v.services);
-            v
-        }
-        Err(e) => {
-            println!("[{}] Handshake failed: {}", addr, e);
-            db.mark_unreachable(addr);
-            return;
-        }
-    };
-
-    // ── Message loop ──────────────────────────────────────────────────────────
-    match network::client::run(&mut stream, MAGIC).await {
-        Ok(discovered) => {
-            println!("[{}] Done. Discovered {} peer(s).", addr, discovered.len());
-            for peer_addr in discovered {
-                let info = PeerInfo::new(peer_addr, PeerSource::AddrMsg);
-                db.upsert(info);
+                let mut info = store.load_all()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .find(|p| p.addr == peer_addr)
+                    .unwrap_or_else(|| PeerInfo::new(peer_addr, PeerSource::DnsSeed));
+                info.mark_success(v.services);
+                store.upsert(&info).unwrap();
+                log.debug(Subsystem::Database, Event::PeerUpdated(peer_addr, info.status));
+            }
+            Err(e) => {
+                log.warn(Subsystem::Network, Event::HandshakeFailed(peer_addr, e.to_string()));
+                // mark as unreachable so we don't retry immediately
+                let mut info = PeerInfo::new(peer_addr, PeerSource::DnsSeed);
+                info.mark_attempt();
+                store.upsert(&info).unwrap();
+                continue;
             }
         }
-        Err(e) => {
-            println!("[{}] Error in message loop: {}", addr, e);
-        }
-    }
 
-    let _ = peer_ver; // suppress unused warning
+        // ── Message loop ──────────────────────────────────────────────────────
+        match network::client::run(&mut stream, MAGIC).await {
+            Ok(discovered) => {
+                log.info(Subsystem::Network, Event::ConnectionClosed(peer_addr));
+                for addr in &discovered {
+                    let info = PeerInfo::new(*addr, PeerSource::AddrMsg);
+                    store.upsert(&info).unwrap();
+                    log.trace(Subsystem::Database, Event::PeerSaved(*addr));
+                }
+                log.info(Subsystem::Database, Event::Custom(
+                    format!("saved {} discovered peer(s), total={}", discovered.len(), store.count().unwrap_or(0))
+                ));
+            }
+            Err(e) => {
+                log.error(Subsystem::Network, Event::Custom(format!("connection error: {}", e)));
+                // mark as unreachable so we don't retry immediately
+                let mut info = PeerInfo::new(peer_addr, PeerSource::AddrMsg);
+                info.mark_attempt();
+                store.upsert(&info).unwrap();
+            }
+        }
+
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    }
 }

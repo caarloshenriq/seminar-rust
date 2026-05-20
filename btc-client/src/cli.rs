@@ -1,5 +1,14 @@
 use clap::Parser;
 
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum Verbosity {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
 /// A minimal Bitcoin P2P crawler.
 #[derive(Parser, Debug)]
 #[command(name = "btc-client", about, long_about = None)]
@@ -27,4 +36,8 @@ pub struct Cli {
     /// Connection timeout in seconds
     #[arg(long, default_value_t = 30)]
     pub timeout: u64,
+
+    /// Minimum log verbosity level
+    #[arg(long, value_enum, default_value_t = Verbosity::Info)]
+    pub verbosity: Verbosity,
 }
