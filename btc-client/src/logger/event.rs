@@ -105,3 +105,74 @@ impl LogMessage {
         Self { level, subsystem, event, timestamp }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    fn addr(ip: [u8; 4], port: u16) -> SocketAddr {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::from(ip)), port)
+    }
+
+    #[test]
+    fn test_log_level_ordering() {
+        assert!(LogLevel::Trace < LogLevel::Debug);
+        assert!(LogLevel::Debug < LogLevel::Info);
+        assert!(LogLevel::Info  < LogLevel::Warn);
+        assert!(LogLevel::Warn  < LogLevel::Error);
+    }
+
+    #[test]
+    fn test_log_level_display() {
+        assert_eq!(LogLevel::Info.to_string(),  "INFO ");
+        assert_eq!(LogLevel::Warn.to_string(),  "WARN ");
+        assert_eq!(LogLevel::Error.to_string(), "ERROR");
+        assert_eq!(LogLevel::Debug.to_string(), "DEBUG");
+        assert_eq!(LogLevel::Trace.to_string(), "TRACE");
+    }
+
+    #[test]
+    fn test_event_display_connected() {
+        let a = addr([1, 2, 3, 4], 8333);
+        let msg = Event::Connected(a).to_string();
+        assert!(msg.contains("1.2.3.4:8333"));
+        assert!(msg.contains("connected"));
+    }
+
+    #[test]
+    fn test_event_display_failed_connection() {
+        let a = addr([5, 6, 7, 8], 8333);
+        let msg = Event::FailedConnection(a, "timeout".into()).to_string();
+        assert!(msg.contains("5.6.7.8:8333"));
+        assert!(msg.contains("timeout"));
+    }
+
+    #[test]
+    fn test_event_display_dns_resolved() {
+        let msg = Event::DnsResolved("dnsseed.local".into(), 42).to_string();
+        assert!(msg.contains("42"));
+        assert!(msg.contains("dnsseed.local"));
+    }
+
+    #[test]
+    fn test_event_display_custom() {
+        let msg = Event::Custom("hello world".into()).to_string();
+        assert_eq!(msg, "hello world");
+    }
+
+    #[test]
+    fn test_log_message_timestamp_is_recent() {
+        let msg = LogMessage::new(
+            LogLevel::Info,
+            Subsystem::Network,
+            Event::Custom("test".into()),
+        );
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        assert!(msg.timestamp <= now);
+        assert!(msg.timestamp >= now - 2);
+    }
+}

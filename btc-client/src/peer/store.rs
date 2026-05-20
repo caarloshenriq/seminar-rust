@@ -314,4 +314,55 @@ mod tests {
 
         assert_eq!(store.count().unwrap(), 5);
     }
+
+    #[test]
+    fn test_load_never_tried_returns_only_never_tried() {
+        let store = in_memory_store();
+
+        let peer_a = make_peer([1, 1, 1, 1], 8333, PeerSource::DnsSeed); // NeverTried
+        let mut peer_b = make_peer([2, 2, 2, 2], 8333, PeerSource::DnsSeed);
+        let mut peer_c = make_peer([3, 3, 3, 3], 8333, PeerSource::DnsSeed);
+
+        peer_b.mark_success(ServiceFlags::NONE); // Reachable
+        peer_c.mark_attempt();                   // Unreachable
+
+        store.upsert(&peer_a).unwrap();
+        store.upsert(&peer_b).unwrap();
+        store.upsert(&peer_c).unwrap();
+
+        let never_tried = store.load_never_tried().unwrap();
+        assert_eq!(never_tried.len(), 1);
+        assert_eq!(never_tried[0].addr, peer_a.addr);
+    }
+
+    #[test]
+    fn test_load_never_tried_empty_when_all_attempted() {
+        let store = in_memory_store();
+
+        let mut peer_a = make_peer([1, 1, 1, 1], 8333, PeerSource::DnsSeed);
+        let mut peer_b = make_peer([2, 2, 2, 2], 8333, PeerSource::DnsSeed);
+
+        peer_a.mark_attempt();
+        peer_b.mark_success(ServiceFlags::NONE);
+
+        store.upsert(&peer_a).unwrap();
+        store.upsert(&peer_b).unwrap();
+
+        let never_tried = store.load_never_tried().unwrap();
+        assert!(never_tried.is_empty());
+    }
+
+    #[test]
+    fn test_load_never_tried_respects_limit() {
+        let store = in_memory_store();
+
+        // insert 60 NeverTried peers — limit is 50
+        for i in 0u8..60 {
+            let peer = make_peer([i, 0, 0, 1], 8333, PeerSource::AddrMsg);
+            store.upsert(&peer).unwrap();
+        }
+
+        let never_tried = store.load_never_tried().unwrap();
+        assert!(never_tried.len() <= 50);
+    }
 }
